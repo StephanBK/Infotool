@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>INOVUES — NYC Ownership Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --ink: #0a0a0f;
+  --paper: #f5f4f0;
+  --accent: #ff4d1c;
+  --accent2: #0033ff;
+  --mid: #6b6b72;
+  --border: #d8d7d3;
+  --card: #ffffff;
+  --success: #00b36b;
+  --warn: #f5a623;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* NAV */
+nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 40px;
+  border-bottom: 1px solid var(--border);
+  background: var(--ink);
+  position: sticky; top: 0; z-index: 100;
+}
+.nav-logo {
+  font-family: 'Space Mono', monospace;
+  font-size: 15px; font-weight: 700;
+  color: #fff; letter-spacing: 0.05em;
+}
+.nav-logo span { color: var(--accent); }
+.nav-badge {
+  font-size: 11px; padding: 4px 10px;
+  background: var(--accent); color: #fff;
+  font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* HERO */
+.hero {
+  padding: 60px 40px 40px;
+  max-width: 1200px; margin: 0 auto;
+}
+.hero-eyebrow {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--accent);
+  margin-bottom: 16px;
+}
+.hero h1 {
+  font-size: clamp(32px, 4vw, 52px);
+  font-weight: 600; line-height: 1.1;
+  letter-spacing: -0.02em;
+  max-width: 700px;
+}
+.hero h1 em { font-style: normal; color: var(--accent2); }
+.hero-sub {
+  margin-top: 16px; font-size: 17px;
+  color: var(--mid); max-width: 560px;
+  line-height: 1.6;
+}
+
+/* TABS */
+.tabs-wrap {
+  max-width: 1200px; margin: 40px auto 0;
+  padding: 0 40px;
+}
+.tabs {
+  display: flex; border-bottom: 1px solid var(--border);
+  gap: 0;
+}
+.tab {
+  padding: 12px 28px;
+  font-family: 'Space Mono', monospace;
+  font-size: 12px; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer; border: none; background: none;
+  color: var(--mid); border-bottom: 2px solid transparent;
+  transition: all 0.15s; position: relative; bottom: -1px;
+}
+.tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+  font-weight: 700;
+}
+
+/* PANELS */
+.panel { display: none; padding: 40px 0; }
+.panel.active { display: block; }
+
+/* SEARCH CARD */
+.search-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 32px;
+  max-width: 680px;
+}
+.search-card h2 {
+  font-size: 20px; font-weight: 600; margin-bottom: 8px;
+}
+.search-card p {
+  color: var(--mid); font-size: 14px; margin-bottom: 28px; line-height: 1.5;
+}
+
+.input-group { margin-bottom: 16px; }
+.input-group label {
+  display: block; font-size: 11px;
+  font-family: 'Space Mono', monospace;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--mid); margin-bottom: 8px;
+}
+.input-group input, .input-group select {
+  width: 100%; padding: 12px 16px;
+  border: 1px solid var(--border);
+  background: var(--paper);
+  font-family: 'DM Sans', sans-serif; font-size: 15px;
+  color: var(--ink); outline: none;
+  transition: border-color 0.15s;
+}
+.input-group input:focus, .input-group select:focus {
+  border-color: var(--accent2);
+}
+.input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+.divider {
+  text-align: center; margin: 20px 0;
+  position: relative;
+  color: var(--mid); font-size: 12px;
+  font-family: 'Space Mono', monospace;
+}
+.divider::before, .divider::after {
+  content: ''; position: absolute; top: 50%;
+  width: calc(50% - 24px); height: 1px;
+  background: var(--border);
+}
+.divider::before { left: 0; }
+.divider::after { right: 0; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 28px;
+  background: var(--ink); color: #fff;
+  font-family: 'Space Mono', monospace;
+  font-size: 12px; letter-spacing: 0.08em;
+  text-transform: uppercase; cursor: pointer;
+  border: none; font-weight: 700;
+  transition: background 0.15s;
+}
+.btn:hover { background: var(--accent); }
+.btn.secondary {
+  background: transparent; color: var(--ink);
+  border: 1px solid var(--border);
+}
+.btn.secondary:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
+.btn.accent { background: var(--accent); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* RESULTS */
+.results-wrap { margin-top: 40px; }
+
+.result-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 20px;
+  padding: 24px 28px;
+  background: var(--ink); color: #fff;
+  margin-bottom: 2px;
+}
+.result-bbl {
+  font-family: 'Space Mono', monospace;
+  font-size: 22px; font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.result-address { font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 4px; }
+.result-export {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px; margin-bottom: 2px;
+}
+.info-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 24px;
+}
+.info-card.full { grid-column: 1 / -1; }
+.info-card h3 {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--accent);
+  margin-bottom: 16px;
+}
+.kv-row {
+  display: flex; justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+.kv-row:last-child { border-bottom: none; }
+.kv-label {
+  font-size: 12px; color: var(--mid);
+  flex-shrink: 0;
+}
+.kv-value {
+  font-size: 13px; font-weight: 500;
+  text-align: right; word-break: break-word;
+}
+.kv-value.highlight { color: var(--accent2); font-weight: 600; }
+.kv-value.success { color: var(--success); }
+.kv-value.warn { color: var(--warn); }
+.kv-value.missing { color: var(--mid); font-style: italic; }
+
+/* DEED TABLE */
+.deed-table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead tr {
+  background: var(--paper);
+  border-bottom: 2px solid var(--border);
+}
+th {
+  padding: 10px 16px; text-align: left;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--mid);
+  font-weight: 400; white-space: nowrap;
+}
+td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+tr:hover td { background: var(--paper); }
+.doc-link {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px; color: var(--accent2);
+  text-decoration: none;
+}
+.doc-link:hover { text-decoration: underline; }
+.amount-chip {
+  background: var(--paper); padding: 2px 8px;
+  font-size: 12px; font-weight: 600;
+  white-space: nowrap;
+}
+
+/* FEED */
+.feed-controls {
+  background: var(--card); border: 1px solid var(--border);
+  padding: 24px 32px; margin-bottom: 2px;
+  display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap;
+}
+.feed-controls .input-group { margin-bottom: 0; min-width: 160px; }
+
+.feed-stats {
+  background: var(--ink); color: #fff;
+  padding: 16px 28px;
+  display: flex; gap: 40px;
+  margin-bottom: 2px;
+}
+.stat { }
+.stat-val {
+  font-family: 'Space Mono', monospace;
+  font-size: 28px; font-weight: 700;
+}
+.stat-label { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+
+/* LOADING / ERRORS */
+.loading {
+  padding: 60px; text-align: center;
+  color: var(--mid);
+}
+.spinner {
+  display: inline-block; width: 24px; height: 24px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-bottom: 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-card {
+  background: #fff0ee; border: 1px solid var(--accent);
+  padding: 20px 24px; color: var(--accent);
+  font-size: 14px;
+}
+.error-card strong { display: block; margin-bottom: 4px; }
+
+.pierce-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; font-size: 11px;
+  font-family: 'Space Mono', monospace;
+  font-weight: 700; letter-spacing: 0.06em;
+}
+.pierce-badge.found { background: #e6f9f2; color: var(--success); }
+.pierce-badge.not-found { background: #fff5e6; color: var(--warn); }
+.pierce-badge.llc { background: #e8ecff; color: var(--accent2); }
+
+/* FOOTER */
+footer {
+  text-align: center; padding: 40px;
+  border-top: 1px solid var(--border);
+  color: var(--mid); font-size: 12px;
+  margin-top: 80px;
+  font-family: 'Space Mono', monospace;
+}
+
+/* ANIMATIONS */
+.fade-in {
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 700px) {
+  nav, .hero, .tabs-wrap { padding-left: 20px; padding-right: 20px; }
+  .section-grid { grid-template-columns: 1fr; }
+  .input-row { grid-template-columns: 1fr; }
+  .result-header { flex-direction: column; }
+  .feed-controls { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">INO<span>V</span>UES <span style="color:rgba(255,255,255,0.3);margin:0 8px">|</span> <span style="color:rgba(255,255,255,0.6);font-size:12px">NYC Ownership Intel</span></div>
+  <div class="nav-badge">Beta</div>
+</nav>
+
+<div class="hero">
+  <div class="hero-eyebrow">Public Records Intelligence</div>
+  <h1>Who <em>really</em> owns<br>this building?</h1>
+  <p class="hero-sub">Lookup NYC commercial property ownership through ACRIS deed records, then pierce LLC structures via NYS Department of State filings. Built for INOVUES prospecting.</p>
+</div>
+
+<div class="tabs-wrap">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('lookup')">Property Lookup</button>
+    <button class="tab" onclick="switchTab('feed')">Weekly Transfer Feed</button>
+  </div>
+
+  <!-- LOOKUP PANEL -->
+  <div class="panel active" id="panel-lookup">
+    <div class="search-card">
+      <h2>Property Search</h2>
+      <p>Search by street address + borough, or enter the BBL directly if you have it.</p>
+
+      <div class="input-row">
+        <div class="input-group">
+          <label>Street Address</label>
+          <input type="text" id="inp-address" placeholder="350 Fifth Avenue" />
+        </div>
+        <div class="input-group">
+          <label>Borough</label>
+          <select id="inp-borough">
+            <option value="manhattan">Manhattan</option>
+            <option value="brooklyn">Brooklyn</option>
+            <option value="queens">Queens</option>
+            <option value="bronx">Bronx</option>
+            <option value="staten island">Staten Island</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="divider">or enter BBL directly</div>
+
+      <div class="input-group">
+        <label>BBL (10-digit)</label>
+        <input type="text" id="inp-bbl" placeholder="1008340001  (borough+block+lot)" />
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:8px">
+        <button class="btn" onclick="doLookup()" id="btn-lookup">
+          <span>→</span> Search Ownership
+        </button>
+        <button class="btn secondary" onclick="clearResults()">Clear</button>
+      </div>
+    </div>
+
+    <div class="results-wrap" id="lookup-results"></div>
+  </div>
+
+  <!-- FEED PANEL -->
+  <div class="panel" id="panel-feed">
+    <div class="feed-controls">
+      <div class="input-group">
+        <label>Days Back</label>
+        <select id="feed-days">
+          <option value="7">Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>Borough</label>
+        <select id="feed-borough">
+          <option value="">All Boroughs</option>
+          <option value="1">Manhattan</option>
+          <option value="2">Bronx</option>
+          <option value="3">Brooklyn</option>
+          <option value="4">Queens</option>
+          <option value="5">Staten Island</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>Min Sale Price ($)</label>
+        <input type="number" id="feed-min" placeholder="500000" style="background:#f5f4f0"/>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-end">
+        <button class="btn" onclick="loadFeed()" id="btn-feed">→ Load Feed</button>
+        <button class="btn secondary" id="btn-feed-export" onclick="exportFeed()" disabled>⬇ Export CSV</button>
+      </div>
+    </div>
+
+    <div id="feed-results"></div>
+  </div>
+</div>
+
+<footer>
+  INOVUES Ownership Tool — Data: NYC ACRIS · MapPLUTO · NYS DOS · All public records
+</footer>
+
+<script>
+const API = '';  // same-origin
+
+// ── TAB SWITCHING ──────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+// ── LOOKUP ─────────────────────────────────────────────────────────────────
+async function doLookup() {
+  const address = document.getElementById('inp-address').value.trim();
+  const borough = document.getElementById('inp-borough').value;
+  const bbl     = document.getElementById('inp-bbl').value.trim().replace(/\D/g, '');
+  
+  if (!address && !bbl) {
+    showError('lookup-results', 'Enter an address or BBL to search.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-lookup');
+  btn.disabled = true;
+  
+  document.getElementById('lookup-results').innerHTML = `
+    <div class="loading">
+      <div class="spinner"></div>
+      <div style="font-family:'Space Mono',monospace;font-size:13px">
+        Querying ACRIS · PLUTO · NYS DOS...
+      </div>
+      <div style="font-size:12px;color:#999;margin-top:8px">LLC piercing takes 5–15 seconds</div>
+    </div>`;
+
+  const params = new URLSearchParams();
+  if (bbl) params.set('bbl', bbl);
+  else { params.set('address', address); params.set('borough', borough); }
+
+  try {
+    const r = await fetch(`${API}/api/lookup?${params}`);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'API error');
+    renderLookup(data);
+  } catch(e) {
+    showError('lookup-results', e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderLookup(d) {
+  const binfo = d.building_info || {};
+  const owner = d.current_owner || {};
+  const llc   = owner.llc_pierce || {};
+  const deeds = d.deed_history || [];
+
+  const bClassMap = {
+    'O': 'Office', 'K': 'Store/Loft', 'R': 'Condo', 'D': 'Elevator Apt',
+    'C': 'Walk-Up Apt', 'E': 'Warehouse', 'F': 'Factory/Industrial',
+    'G': 'Garage', 'H': 'Hotel', 'I': 'Hospital', 'J': 'Theatre',
+    'L': 'Loft', 'M': 'Religious', 'N': 'Asylums', 'P': 'Indoor Public Assembly',
+    'Q': 'Outdoor Recreation', 'S': 'Mixed Residential', 'T': 'Transportation',
+    'U': 'Utility', 'V': 'Vacant Land', 'W': 'Educational', 'Y': 'Gov/Municipal', 'Z': 'Special'
+  };
+  const bClass = binfo.bldgclass || '';
+  const bType  = bClassMap[bClass[0]] || bClass;
+
+  const isLLC = owner.name_raw && /LLC|INC|CORP|LP|LTD|TRUST/i.test(owner.name_raw);
+  const pierceBadge = isLLC
+    ? (llc.dos_id
+        ? `<span class="pierce-badge found">✓ DOS Record Found</span>`
+        : `<span class="pierce-badge not-found">⚠ No DOS Match</span>`)
+    : `<span class="pierce-badge llc" style="background:#f0f0f0;color:#666">Individual Owner</span>`;
+
+  const exportUrl = d.bbl
+    ? `${API}/api/lookup/export?bbl=${d.bbl}`
+    : '';
+
+  let html = `<div class="fade-in">`;
+
+  // Header
+  html += `
+  <div class="result-header">
+    <div>
+      <div class="result-bbl">BBL: ${d.bbl || '—'}</div>
+      <div class="result-address">${d.address_resolved || '—'}</div>
+    </div>
+    <div class="result-export">
+      <a href="${exportUrl}" class="btn accent" style="text-decoration:none;font-size:11px" ${!d.bbl ? 'style="opacity:0.4;pointer-events:none"' : ''}>⬇ Export CSV</a>
+    </div>
+  </div>`;
+
+  // Grid: Building Info + Current Owner
+  html += `<div class="section-grid">
+    <div class="info-card">
+      <h3>Building Info</h3>
+      ${kv('BBL', d.bbl)}
+      ${kv('Address', binfo.address || d.address_resolved || '—')}
+      ${kv('Borough', ['','Manhattan','Bronx','Brooklyn','Queens','Staten Island'][parseInt(d.bbl_parts?.borough)] || d.bbl_parts?.borough)}
+      ${kv('Building Class', bClass ? `${bClass} — ${bType}` : '—')}
+      ${kv('Year Built', binfo.yearbuilt || '—')}
+      ${kv('Floors', binfo.numfloors || '—')}
+      ${kv('Building Area', binfo.bldgarea ? `${Number(binfo.bldgarea).toLocaleString()} sqft` : '—')}
+      ${kv('Lot Area', binfo.lotarea ? `${Number(binfo.lotarea).toLocaleString()} sqft` : '—')}
+      ${kv('Total Units', binfo.unitstotal || '—')}
+    </div>
+    <div class="info-card">
+      <h3>Current Owner ${pierceBadge}</h3>
+      ${kv('Owner Name (ACRIS)', `<span class="kv-value highlight">${owner.name_raw || '—'}</span>`)}
+      ${kv('PLUTO Owner', binfo.ownername || '—')}
+      <div style="margin:16px 0 8px;border-top:1px solid var(--border);padding-top:16px">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent2);margin-bottom:12px">NYS DOS LLC Pierce</div>
+        ${kv('DOS Entity ID', llc.dos_id || '<span class="kv-value missing">Not found</span>')}
+        ${kv('Status', llc.dos_status || '<span class="kv-value missing">—</span>')}
+        ${kv('Date Formed', llc.date_formed || '<span class="kv-value missing">—</span>')}
+        ${kv('CEO / Principal', llc.ceo_name ? `<span class="kv-value success">${llc.ceo_name}</span>` : '<span class="kv-value missing">Not disclosed</span>')}
+        ${kv('Registered Agent', llc.registered_agent || '<span class="kv-value missing">—</span>')}
+        ${kv('Principal Address', llc.principal_address || llc.process_address || '<span class="kv-value missing">—</span>')}
+      </div>
+    </div>
+  </div>`;
+
+  // Additional entities
+  if (d.additional_entities && d.additional_entities.length > 0) {
+    const filtered = d.additional_entities.filter(e => e.entity_name && e.entity_name !== owner.name_raw);
+    if (filtered.length > 0) {
+      html += `<div class="info-card full" style="border:1px solid var(--border);background:var(--card);margin-bottom:2px;padding:24px">
+        <h3>Related Entities (from recent deeds)</h3>
+        <div class="section-grid" style="gap:16px;margin-top:0">`;
+      for (const e of filtered) {
+        html += `<div style="padding:16px;background:var(--paper)">
+          <div style="font-weight:600;font-size:13px;margin-bottom:8px">${e.entity_name}</div>
+          ${kv('DOS ID', e.dos_id || '—')}
+          ${kv('Status', e.dos_status || '—')}
+          ${kv('CEO', e.ceo_name || '—')}
+          ${kv('Address', e.process_address || '—')}
+        </div>`;
+      }
+      html += `</div></div>`;
+    }
+  }
+
+  // Deed history table
+  if (deeds.length > 0) {
+    html += `<div class="info-card full" style="padding:24px">
+      <h3>Deed Transfer History (${deeds.length} records)</h3>
+      <div class="deed-table-wrap">
+        <table>
+          <thead><tr>
+            <th>Date</th>
+            <th>Doc Type</th>
+            <th>Buyer (Grantee)</th>
+            <th>Seller (Grantor)</th>
+            <th>Amount</th>
+            <th>Doc ID</th>
+          </tr></thead>
+          <tbody>`;
+    
+    for (const deed of deeds) {
+      const date = (deed.recorded_datetime || deed.doc_date || '').split('T')[0];
+      const grantee = (deed.grantees || []).map(g => g.name).join(', ') || '—';
+      const grantor = (deed.grantors || []).map(g => g.name).join(', ') || '—';
+      const amt = deed.document_amt 
+        ? `<span class="amount-chip">$${Number(deed.document_amt).toLocaleString()}</span>` 
+        : '<span style="color:var(--mid)">—</span>';
+      const docLink = deed.documentid
+        ? `<a class="doc-link" href="https://a836-acris.nyc.gov/DS/DocumentSearch/DocumentImageView?doc_id=${deed.documentid}" target="_blank">${deed.documentid.slice(-8)}</a>`
+        : '—';
+      
+      html += `<tr>
+        <td style="white-space:nowrap;font-family:'Space Mono',monospace;font-size:11px">${date}</td>
+        <td><span style="font-size:11px;font-family:'Space Mono',monospace">${deed.doc_type || '—'}</span></td>
+        <td style="font-weight:500;color:var(--accent2)">${grantee}</td>
+        <td style="color:var(--mid)">${grantor}</td>
+        <td>${amt}</td>
+        <td>${docLink}</td>
+      </tr>`;
+    }
+    html += `</tbody></table></div></div>`;
+  } else {
+    html += `<div class="info-card full" style="padding:24px">
+      <h3>Deed Transfer History</h3>
+      <p style="color:var(--mid);font-size:14px">No deed records found in ACRIS for this BBL. 
+      This may occur for condos, co-ops, or properties with only pre-1966 records.</p>
+    </div>`;
+  }
+
+  html += `<div style="font-size:11px;color:var(--mid);padding:16px 0;font-family:'Space Mono',monospace">
+    Sources: ${(d.data_sources||[]).join(' · ')} · Generated ${new Date(d.timestamp).toLocaleString()}
+  </div>`;
+
+  html += `</div>`;
+  document.getElementById('lookup-results').innerHTML = html;
+}
+
+// ── FEED ───────────────────────────────────────────────────────────────────
+let lastFeedData = null;
+
+async function loadFeed() {
+  const days    = document.getElementById('feed-days').value;
+  const borough = document.getElementById('feed-borough').value;
+  const minAmt  = document.getElementById('feed-min').value;
+
+  const btn = document.getElementById('btn-feed');
+  btn.disabled = true;
+  document.getElementById('btn-feed-export').disabled = true;
+
+  document.getElementById('feed-results').innerHTML = `
+    <div class="loading">
+      <div class="spinner"></div>
+      <div style="font-family:'Space Mono',monospace;font-size:13px">Loading ACRIS transfer records...</div>
+    </div>`;
+
+  const params = new URLSearchParams({ days });
+  if (borough) params.set('borough', borough);
+  if (minAmt)  params.set('min_amount', minAmt);
+
+  try {
+    const r = await fetch(`${API}/api/weekly-feed?${params}`);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'API error');
+    lastFeedData = data;
+    renderFeed(data);
+    document.getElementById('btn-feed-export').disabled = false;
+  } catch(e) {
+    showError('feed-results', e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderFeed(data) {
+  const txns = data.transactions || [];
+  const totalAmt = txns.reduce((s, t) => s + (parseFloat(t.sale_amount) || 0), 0);
+  
+  let html = `<div class="fade-in">
+  <div class="feed-stats">
+    <div class="stat"><div class="stat-val">${txns.length.toLocaleString()}</div><div class="stat-label">Transfers Found</div></div>
+    <div class="stat"><div class="stat-val">$${(totalAmt/1e6).toFixed(1)}M</div><div class="stat-label">Total Volume</div></div>
+    <div class="stat"><div class="stat-val">${data.date_range?.from?.split('T')[0] || '—'}</div><div class="stat-label">From</div></div>
+    <div class="stat"><div class="stat-val">${data.date_range?.to?.split('T')[0] || '—'}</div><div class="stat-label">To</div></div>
+  </div>
+
+  <div class="info-card full" style="padding:24px">
+    <h3>${txns.length} Deed Transfers</h3>
+    <div class="deed-table-wrap">
+      <table>
+        <thead><tr>
+          <th>Recorded</th>
+          <th>BBL</th>
+          <th>Doc Type</th>
+          <th>Buyer</th>
+          <th>Seller</th>
+          <th>Amount</th>
+          <th>ACRIS</th>
+        </tr></thead>
+        <tbody>`;
+
+  if (txns.length === 0) {
+    html += `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--mid)">
+      No transfers found for this period/filter.
+    </td></tr>`;
+  }
+
+  for (const t of txns) {
+    const date = (t.recorded_date || '').split('T')[0];
+    const amt = t.sale_amount
+      ? `<span class="amount-chip">$${Number(t.sale_amount).toLocaleString()}</span>`
+      : '<span style="color:var(--mid)">—</span>';
+    const link = t.acris_url
+      ? `<a class="doc-link" href="${t.acris_url}" target="_blank">View ↗</a>`
+      : '—';
+    const buyer  = t.buyer  || '<span style="color:var(--mid)">—</span>';
+    const seller = t.seller || '<span style="color:var(--mid)">—</span>';
+    const boroughName = ['','Manhattan','Bronx','Brooklyn','Queens','SI'][parseInt(t.borough)] || t.borough || '';
+
+    html += `<tr>
+      <td style="white-space:nowrap;font-family:'Space Mono',monospace;font-size:11px">${date}</td>
+      <td>
+        <div style="font-family:'Space Mono',monospace;font-size:11px;cursor:pointer;color:var(--accent2)" 
+             onclick="lookupBBL('${t.bbl}')" title="Click to lookup this property">
+          ${t.bbl || '—'}
+        </div>
+        <div style="font-size:11px;color:var(--mid)">${boroughName} B${t.block} L${t.lot}</div>
+      </td>
+      <td><span style="font-family:'Space Mono',monospace;font-size:11px">${t.doc_type || '—'}</span></td>
+      <td style="font-weight:500;color:var(--accent2);max-width:180px">${buyer}</td>
+      <td style="color:var(--mid);max-width:180px">${seller}</td>
+      <td>${amt}</td>
+      <td>${link}</td>
+    </tr>`;
+  }
+
+  html += `</tbody></table></div>
+    <div style="font-size:11px;color:var(--mid);padding:16px 0 0;font-family:'Space Mono',monospace">
+      Generated ${new Date(data.generated_at).toLocaleString()} · Click any BBL to do full ownership lookup
+    </div>
+  </div></div>`;
+
+  document.getElementById('feed-results').innerHTML = html;
+}
+
+function lookupBBL(bbl) {
+  if (!bbl) return;
+  document.getElementById('inp-bbl').value = bbl;
+  document.getElementById('inp-address').value = '';
+  switchTabByName('lookup');
+  doLookup();
+}
+
+function switchTabByName(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', t.textContent.toLowerCase().includes(name));
+  });
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'panel-' + name);
+  });
+}
+
+function exportFeed() {
+  const days    = document.getElementById('feed-days').value;
+  const borough = document.getElementById('feed-borough').value;
+  const minAmt  = document.getElementById('feed-min').value;
+  const params  = new URLSearchParams({ days });
+  if (borough) params.set('borough', borough);
+  if (minAmt)  params.set('min_amount', minAmt);
+  window.open(`${API}/api/weekly-feed/export?${params}`, '_blank');
+}
+
+// ── UTILS ──────────────────────────────────────────────────────────────────
+function kv(label, value) {
+  return `<div class="kv-row">
+    <span class="kv-label">${label}</span>
+    <span class="kv-value">${value ?? '—'}</span>
+  </div>`;
+}
+
+function showError(containerId, msg) {
+  document.getElementById(containerId).innerHTML = `
+    <div class="error-card fade-in">
+      <strong>Error</strong>${msg}
+    </div>`;
+}
+
+function clearResults() {
+  document.getElementById('lookup-results').innerHTML = '';
+  document.getElementById('inp-address').value = '';
+  document.getElementById('inp-bbl').value = '';
+}
+
+// Enter key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const active = document.querySelector('.panel.active');
+    if (active?.id === 'panel-lookup') doLookup();
+    if (active?.id === 'panel-feed') loadFeed();
+  }
+});
+</script>
+</body>
+</html>
