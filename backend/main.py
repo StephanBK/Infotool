@@ -647,31 +647,49 @@ async def health():
 # ─── DEBUG: raw ACRIS query ───────────────────────────────────────────────────
 @app.get("/api/debug/acris")
 async def debug_acris(days: int = 7):
-    """Raw ACRIS query — shows exactly what the API returns so we can tune filters."""
+    """
+    Tests all known ACRIS dataset IDs and returns raw results.
+    Use this to find which datasets are live and what fields they have.
+    """
     since_date = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S.000")
+
+    # All known dataset IDs — old and new
+    datasets = {
+        "master_old":   "https://data.cityofnewyork.us/resource/bnx9-e6tj.json",
+        "master_v2":    "https://data.cityofnewyork.us/resource/9uxe-2pis.json",
+        "legals_old":   "https://data.cityofnewyork.us/resource/8h5j-fqxa.json",
+        "parties_old":  "https://data.cityofnewyork.us/resource/636b-3b5g.json",
+        "parties_mod":  "https://data.cityofnewyork.us/resource/8yfw-gfkq.json",  # modified view
+    }
+
+    results = {}
     async with httpx.AsyncClient() as client:
-        recent = await soda_get(client, ACRIS_MASTER_URL, {
-            "$order": "recorded_datetime DESC",
-            "$limit": 5,
-            "$select": "documentid,doc_type,doc_class,document_amt,recorded_datetime",
-        })
-        dated = await soda_get(client, ACRIS_MASTER_URL, {
-            "$where": f"recorded_datetime >= '{since_date}'",
-            "$order": "recorded_datetime DESC",
-            "$limit": 5,
-            "$select": "documentid,doc_type,doc_class,document_amt,recorded_datetime",
-        })
-        classes = await soda_get(client, ACRIS_MASTER_URL, {
-            "$order": "recorded_datetime DESC",
-            "$limit": 200,
-            "$select": "doc_type,doc_class",
-        })
-        unique_classes = list({(r.get("doc_class",""), r.get("doc_type","")) for r in classes})
+        for name, url in datasets.items():
+            # Try no-filter first — just get latest row and its field names
+            rows = await soda_get(client, url, {"$limit": 3, "$order": "recorded_datetime DESC"})
+            if not rows:
+                # Try without order (some datasets may not have that field)
+                rows = await soda_get(client, url, {"$limit": 3})
+            results[name] = {
+                "url": url,
+                "row_count_returned": len(rows),
+                "sample_row": rows[0] if rows else None,
+                "field_names": list(rows[0].keys()) if rows else [],
+            }
+
+            # If we got rows, also test with date filter to confirm field name
+            if rows and "recorded_datetime" in (rows[0].keys() if rows else []):
+                dated = await soda_get(client, url, {
+                    "$where": f"recorded_datetime >= '{since_date}'",
+                    "$limit": 3,
+                    "$order": "recorded_datetime DESC",
+                })
+                results[name]["rows_with_date_filter"] = len(dated)
+                results[name]["date_filter_sample"] = dated[0] if dated else None
+
     return {
         "since_date": since_date,
-        "most_recent_5_no_filter": recent,
-        "most_recent_5_with_date_filter": dated,
-        "unique_doc_class_type_combos_in_last_200": unique_classes[:40],
+        "datasets": results,
     }
 
 
