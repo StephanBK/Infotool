@@ -594,14 +594,14 @@ function renderLookup(d) {
           <tbody>`;
     
     for (const deed of deeds) {
-      const date = (deed.recorded_datetime || deed.doc_date || '').split('T')[0];
+      const date = (deed.recorded_datetime || deed.document_date || deed.doc_date || '').split('T')[0];
       const grantee = (deed.grantees || []).map(g => g.name).join(', ') || '—';
       const grantor = (deed.grantors || []).map(g => g.name).join(', ') || '—';
-      const amt = deed.document_amt 
-        ? `<span class="amount-chip">$${Number(deed.document_amt).toLocaleString()}</span>` 
+      const amt = (deed.document_amt || deed.sale_amount)
+        ? `<span class="amount-chip">$${Number(deed.document_amt || deed.sale_amount).toLocaleString()}</span>`
         : '<span style="color:var(--mid)">—</span>';
-      const docLink = deed.documentid
-        ? `<a class="doc-link" href="https://a836-acris.nyc.gov/DS/DocumentSearch/DocumentImageView?doc_id=${deed.documentid}" target="_blank">${deed.documentid.slice(-8)}</a>`
+      const docLink = deed.document_id
+        ? `<a class="doc-link" href="https://a836-acris.nyc.gov/DS/DocumentSearch/DocumentImageView?doc_id=${deed.document_id}" target="_blank">${deed.document_id.slice(-8)}</a>`
         : '—';
       
       html += `<tr>
@@ -684,6 +684,7 @@ function renderFeed(data) {
       <table>
         <thead><tr>
           <th>Recorded</th>
+          <th>Doc Date</th>
           <th>BBL</th>
           <th>Doc Type</th>
           <th>Buyer</th>
@@ -694,7 +695,7 @@ function renderFeed(data) {
         <tbody>`;
 
   if (txns.length === 0) {
-    html += `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--mid)">
+    html += `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--mid)">
       No transfers found for this period/filter.
     </td></tr>`;
   }
@@ -711,8 +712,10 @@ function renderFeed(data) {
     const seller = t.seller || '<span style="color:var(--mid)">—</span>';
     const boroughName = ['','Manhattan','Bronx','Brooklyn','Queens','SI'][parseInt(t.borough)] || t.borough || '';
 
+    const docDate = (t.document_date || '').split('T')[0];
     html += `<tr>
       <td style="white-space:nowrap;font-family:'Space Mono',monospace;font-size:11px">${date}</td>
+      <td style="white-space:nowrap;font-family:'Space Mono',monospace;font-size:11px;color:var(--mid)">${docDate || '—'}</td>
       <td>
         <div style="font-family:'Space Mono',monospace;font-size:11px;cursor:pointer;color:var(--accent2)" 
              onclick="lookupBBL('${t.bbl}')" title="Click to lookup this property">
