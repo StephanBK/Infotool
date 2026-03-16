@@ -555,21 +555,24 @@ async def get_weekly_feed(
             leg = legs[0] if legs else {}
             parts = parties_by_doc.get(did, {"grantors": [], "grantees": []})
             
-            # Construct BBL
-            b, bl, lt = leg.get("borough",""), leg.get("block",""), leg.get("lot","")
+            # Construct BBL — prefer legals data, fall back to recorded_borough from master
+            b  = leg.get("borough","") or master.get("recorded_borough","")
+            bl = leg.get("block","")
+            lt = leg.get("lot","")
             bbl_str = normalize_bbl(b, bl.zfill(5), lt.zfill(4)) if b and bl and lt else ""
 
             transactions.append({
                 "document_id": did,
                 "bbl": bbl_str,
                 "borough": b,
+                "borough_name": ["","Manhattan","Bronx","Brooklyn","Queens","Staten Island"][int(b)] if b and b.isdigit() and int(b) <= 5 else b,
                 "block": bl,
                 "lot": lt,
-                "address": leg.get("property_type"),
+                "property_type": leg.get("property_type",""),
                 "doc_type": master.get("doc_type"),
                 "sale_amount": master.get("document_amt"),
                 "recorded_date": master.get("recorded_datetime"),
-                "doc_date": master.get("doc_date"),
+                "document_date": master.get("document_date"),
                 "crfn": master.get("crfn"),
                 "buyer": parts["grantees"][0]["name"] if parts["grantees"] else None,
                 "buyer_address": parts["grantees"][0]["address"] if parts["grantees"] else None,
@@ -587,20 +590,41 @@ async def get_weekly_feed(
 
 
 async def _batch_fetch_legals(doc_ids: list, client: httpx.AsyncClient, borough_filter: Optional[str]) -> list:
+    """
+    ACRIS legals dataset (8h5j-fqxa) returns 0 rows — appears broken/deprecated.
+    Fallback: query the ACRIS real property legals via a different known-good approach.
+    We try multiple dataset IDs for legals.
+    """
+    LEGALS_URLS = [
+        "https://data.cityofnewyork.us/resource/8h5j-fqxa.json",   # original
+        "https://data.cityofnewyork.us/resource/i6gc-xnbv.json",   # alternate view
+    ]
     all_legals = []
-    batch_size = 100
+    batch_size = 50
     for i in range(0, min(len(doc_ids), 500), batch_size):
         batch = doc_ids[i:i+batch_size]
         id_list = ",".join(f"'{d}'" for d in batch)
-        where = f"documentid in ({id_list})"
+        where = f"document_id in ({id_list})"
         if borough_filter:
             where += f" AND borough='{borough_filter}'"
-        rows = await soda_get(client, ACRIS_LEGALS_URL, {
-            "$where": where,
-            "$select": "document_id,borough,block,lot,property_type,easement",
-            "$limit": batch_size * 2,
-        })
-        all_legals.extend(rows)
+        found = False
+        for url in LEGALS_URLS:
+            rows = await soda_get(client, url, {
+                "$where": where,
+                "$select": "document_id,borough,block,lot,property_type",
+                "$limit": batch_size * 2,
+            })
+            if rows:
+                all_legals.extend(rows)
+                found = True
+                break
+        # If still nothing, try without select (maybe field names differ)
+        if not found:
+            rows = await soda_get(client, LEGALS_URLS[0], {
+                "$where": where,
+                "$limit": batch_size * 2,
+            })
+            all_legals.extend(rows)
     return all_legals
 
 
