@@ -63,6 +63,64 @@ DEED_DOC_TYPES = ["DEED", "DEEDO", "DEED, BARGAIN AND SALE", "DEED IN LIEU", "EX
                   "GRANT DEED"]
 
 
+def classify_transfer(doc_type: str, amount: float, buyer: str, seller: str) -> str:
+    """
+    Classify a deed transfer into a human-readable transaction type.
+    Uses doc_type, sale amount, and name pattern matching.
+    """
+    dt  = (doc_type  or "").upper()
+    b   = (buyer     or "").upper()
+    s   = (seller    or "").upper()
+    amt = float(amount) if amount else 0.0
+
+    # Doc type signals — check first, most reliable
+    if "CORRECTION" in dt:            return "Correction Deed"
+    if "GIFT"       in dt:            return "Gift Deed"
+    if "REFEREE"    in dt:            return "Foreclosure / Referee Deed"
+    if "COMMISSIONER" in dt:          return "Foreclosure / Commissioner Deed"
+    if "EXECUTOR"   in dt:            return "Executor Deed (Estate)"
+    if "ADMINISTRATOR" in dt:         return "Administrator Deed (Estate)"
+    if "QUITCLAIM"  in dt:            return "Quitclaim Deed"
+    if "IN LIEU"    in dt:            return "Deed in Lieu of Foreclosure"
+
+    # Name pattern signals
+    is_trust     = any(w in b for w in ["TRUST","TRUSTEE"])
+    is_llc_buyer = any(w in b for w in ["LLC","L.L.C","INC.","CORP","LP ","L.P"])
+    is_estate    = any(w in s for w in ["ESTATE","EXECUTOR","ADMINISTRATOR","DECEASED"])
+    is_referee   = any(w in s for w in ["REFEREE","COMMISSIONER","FORECLOS"])
+    is_bank      = any(w in b for w in ["BANK","NATIONAL ASSOC","TRUST NATIONAL","FEDERAL"])
+
+    if is_referee:                     return "Foreclosure / Sheriff Sale"
+    if is_bank and amt <= 1000:        return "Foreclosure / Bank Acquisition"
+    if is_estate:                      return "Estate / Inheritance Transfer"
+    if is_trust and amt == 0:          return "Transfer to Trust (Estate Planning)"
+    if is_trust and amt > 0:           return "Sale to Trust"
+
+    # LLC transfer — check if same underlying person (name overlap)
+    if is_llc_buyer and amt == 0:
+        # Try to match seller surname in buyer LLC name
+        seller_words = set(s.replace(","," ").split())
+        buyer_words  = set(b.replace(","," ").split())
+        overlap = seller_words & buyer_words - {"THE","OF","AND","LLC","INC","A","AN"}
+        if overlap:                    return "Owner Transfer to Own LLC"
+        else:                          return "Transfer to LLC (New Owner)"
+    if is_llc_buyer and amt > 0:       return "Arm's Length Sale to LLC"
+
+    # Intra-family — same surname, $0
+    if amt == 0:
+        seller_surnames = set(s.replace(","," ").split()[:2])
+        buyer_surnames  = set(b.replace(","," ").split()[:2])
+        if seller_surnames & buyer_surnames - {"THE","OF","AS","A"}:
+            return "Intra-Family Transfer"
+        return "Non-Arms-Length Transfer ($0)"
+
+    # Paid sale — arm's length
+    if amt >= 10000:                   return "Arm's Length Sale"
+    if amt > 0:                        return f"Nominal Consideration (${amt:.0f})"
+    return "Unknown"
+
+
+
 # ─── HELPERS ──────────────────────────────────────────────────────────────────
 def normalize_bbl(borough: str, block: str, lot: str) -> str:
     b = BOROUGH_MAP.get(borough.lower().strip(), borough)
@@ -480,7 +538,7 @@ async def export_property_csv(
 # ─── WEEKLY OWNERSHIP CHANGES FEED ───────────────────────────────────────────
 @app.get("/api/weekly-feed")
 async def get_weekly_feed(
-    days: int = Query(7, description="Number of days back to look"),
+    days: int = Query(30, description="Number of days back to look (max 365)"),
     doc_type: str = Query("DEED", description="Document type filter"),
     borough: Optional[str] = Query(None, description="Filter by borough (1-5)"),
     min_amount: Optional[int] = Query(None, description="Minimum sale price"),
@@ -489,7 +547,7 @@ async def get_weekly_feed(
     Returns a list of NYC commercial property transfers from the last N days.
     ACRIS Open Data lags ~2-4 weeks, so we search back further to guarantee results.
     """
-    # Guarantee at least 45 days back to cover ACRIS lag
+    # Guarantee at least 45 days back to cover ACRIS lag; user can go up to 365
     effective_days = max(days, 45)
     since_date = (datetime.utcnow() - timedelta(days=effective_days)).strftime("%Y-%m-%dT%H:%M:%S.000")
 
@@ -561,6 +619,15 @@ async def get_weekly_feed(
             lt = leg.get("lot","")
             bbl_str = normalize_bbl(b, bl.zfill(5), lt.zfill(4)) if b and bl and lt else ""
 
+            buyer_name  = parts["grantees"][0]["name"] if parts["grantees"] else None
+            seller_name = parts["grantors"][0]["name"] if parts["grantors"] else None
+            amt_raw     = master.get("document_amt")
+            txn_type    = classify_transfer(
+                master.get("doc_type",""),
+                amt_raw,
+                buyer_name or "",
+                seller_name or "",
+            )
             transactions.append({
                 "document_id": did,
                 "bbl": bbl_str,
@@ -570,13 +637,14 @@ async def get_weekly_feed(
                 "lot": lt,
                 "property_type": leg.get("property_type",""),
                 "doc_type": master.get("doc_type"),
-                "sale_amount": master.get("document_amt"),
+                "transaction_type": txn_type,
+                "sale_amount": amt_raw,
                 "recorded_date": master.get("recorded_datetime"),
                 "document_date": master.get("document_date"),
                 "crfn": master.get("crfn"),
-                "buyer": parts["grantees"][0]["name"] if parts["grantees"] else None,
+                "buyer": buyer_name,
                 "buyer_address": parts["grantees"][0]["address"] if parts["grantees"] else None,
-                "seller": parts["grantors"][0]["name"] if parts["grantors"] else None,
+                "seller": seller_name,
                 "seller_address": parts["grantors"][0]["address"] if parts["grantors"] else None,
                 "acris_url": f"https://a836-acris.nyc.gov/DS/DocumentSearch/DocumentImageView?doc_id={did}" if did else None,
             })

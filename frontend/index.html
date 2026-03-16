@@ -404,7 +404,10 @@ footer {
         <select id="feed-days">
           <option value="7">Last 7 days</option>
           <option value="14">Last 14 days</option>
-          <option value="30">Last 30 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="180">Last 6 months</option>
+          <option value="365">Last 1 year</option>
         </select>
       </div>
       <div class="input-group">
@@ -729,7 +732,7 @@ function renderFeed(data) {
           <th>Recorded</th>
           <th>Doc Date</th>
           <th>BBL</th>
-          <th>Doc Type</th>
+          <th>Transaction Type</th>
           <th>Buyer</th>
           <th>Seller</th>
           <th>Amount</th>
@@ -738,7 +741,7 @@ function renderFeed(data) {
         <tbody>`;
 
   if (txns.length === 0) {
-    html += `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--mid)">
+    html += `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--mid)">
       No transfers found for this period/filter.
     </td></tr>`;
   }
@@ -766,7 +769,10 @@ function renderFeed(data) {
         </div>
         <div style="font-size:11px;color:var(--mid)">${boroughName} B${t.block} L${t.lot}</div>
       </td>
-      <td><span style="font-family:'Space Mono',monospace;font-size:11px">${t.doc_type || '—'}</span></td>
+      <td>
+        <div style="font-size:12px;font-weight:500">${t.transaction_type || '—'}</div>
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--mid);margin-top:2px">${t.doc_type || ''}</div>
+      </td>
       <td style="font-weight:500;color:var(--accent2);max-width:180px">${buyer}</td>
       <td style="color:var(--mid);max-width:180px">${seller}</td>
       <td>${amt}</td>
