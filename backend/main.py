@@ -644,12 +644,6 @@ async def health():
     return {"status": "ok", "version": "1.0.0", "tool": "INOVUES Ownership Tool"}
 
 
-# ─── SERVE FRONTEND ───────────────────────────────────────────────────────────
-frontend_path = Path(__file__).parent.parent / "frontend"
-if frontend_path.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="static")
-
-
 # ─── DEBUG: raw ACRIS query ───────────────────────────────────────────────────
 @app.get("/api/debug/acris")
 async def debug_acris(days: int = 7):
@@ -679,3 +673,9 @@ async def debug_acris(days: int = 7):
         "most_recent_5_with_date_filter": dated,
         "unique_doc_class_type_combos_in_last_200": unique_classes[:40],
     }
+
+
+# ─── SERVE FRONTEND (MUST BE LAST) ────────────────────────────────────────────
+frontend_path = Path(__file__).parent.parent / "frontend"
+if frontend_path.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="static")
