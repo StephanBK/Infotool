@@ -673,27 +673,28 @@ async def debug_acris(days: int = 7):
     results = {}
     async with httpx.AsyncClient() as client:
         for name, url in datasets.items():
-            # Try no-filter first — just get latest row and its field names
-            rows = await soda_get(client, url, {"$limit": 3, "$order": "recorded_datetime DESC"})
-            if not rows:
-                # Try without order (some datasets may not have that field)
-                rows = await soda_get(client, url, {"$limit": 3})
+            # No ordering — just get fields first
+            rows = await soda_get(client, url, {"$limit": 3})
+            fields = list(rows[0].keys()) if rows else []
             results[name] = {
                 "url": url,
                 "row_count_returned": len(rows),
+                "field_names": fields,
                 "sample_row": rows[0] if rows else None,
-                "field_names": list(rows[0].keys()) if rows else [],
             }
-
-            # If we got rows, also test with date filter to confirm field name
-            if rows and "recorded_datetime" in (rows[0].keys() if rows else []):
+            # Find date field and test filtering
+            date_field = next((f for f in ["recorded_datetime","doc_date","modified_date","good_through_date"] if f in fields), None)
+            if date_field:
                 dated = await soda_get(client, url, {
-                    "$where": f"recorded_datetime >= '{since_date}'",
+                    "$where": f"{date_field} >= '{since_date}'",
+                    "$order": f"{date_field} DESC",
                     "$limit": 3,
-                    "$order": "recorded_datetime DESC",
                 })
+                results[name]["date_field"] = date_field
                 results[name]["rows_with_date_filter"] = len(dated)
-                results[name]["date_filter_sample"] = dated[0] if dated else None
+                results[name]["date_sample"] = dated[0] if dated else None
+            else:
+                results[name]["date_field"] = "NOT FOUND"
 
     return {
         "since_date": since_date,
