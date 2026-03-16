@@ -35,13 +35,20 @@ app.add_middleware(
 )
 
 # ─── CONSTANTS ────────────────────────────────────────────────────────────────
+# Field names confirmed via /api/debug/acris on 2026-03-15:
+#   master:  document_id, doc_type, recorded_datetime, document_amt, recorded_borough
+#   parties: document_id, party_type, name, address_1, city, state, zip (use _mod)
+#   legals:  broken - use PLUTO for BBL lookup instead
 ACRIS_MASTER_URL   = "https://data.cityofnewyork.us/resource/bnx9-e6tj.json"
-ACRIS_LEGALS_URL   = "https://data.cityofnewyork.us/resource/8h5j-fqxa.json"
-ACRIS_PARTIES_URL  = "https://data.cityofnewyork.us/resource/636b-3b5g.json"
+ACRIS_LEGALS_URL   = "https://data.cityofnewyork.us/resource/8h5j-fqxa.json"  # broken, avoid
+ACRIS_PARTIES_URL  = "https://data.cityofnewyork.us/resource/8yfw-gfkq.json"  # parties_mod - has addresses
+ACRIS_PARTIES_BASIC_URL = "https://data.cityofnewyork.us/resource/636b-3b5g.json"  # fallback
 NYC_GEOCLIENT_URL  = "https://api.nyc.gov/geo/geoclient/v1"
 LOCATE_NYC_URL     = "https://geocoding.geo.census.gov/geocoder/locations/address"
 DOS_SEARCH_URL     = "https://apps.dos.ny.gov/publicInquiry/"
 PLUTO_URL          = "https://data.cityofnewyork.us/resource/64uk-42ks.json"
+# NOTE: ACRIS Open Data lags ~2-4 weeks. recorded_datetime max is ~Feb 28 as of Mar 15.
+# NOTE: field is "document_id" NOT "documentid" - critical for joins
 
 BOROUGH_MAP = {
     "manhattan": "1", "bronx": "2", "brooklyn": "3", "queens": "4", "staten island": "5",
@@ -73,7 +80,9 @@ def parse_bbl_string(bbl: str) -> dict:
 async def soda_get(client: httpx.AsyncClient, url: str, params: dict) -> list:
     """Query NYC Open Data Socrata API with $limit."""
     params.setdefault("$limit", 1000)
-    params.setdefault("$$app_token", os.getenv("NYC_APP_TOKEN", ""))
+    token = os.getenv("NYC_APP_TOKEN", "")
+    if token:
+        params["$$app_token"] = token
     try:
         r = await client.get(url, params=params, timeout=30)
         r.raise_for_status()
@@ -135,7 +144,7 @@ async def get_deed_history(bbl_str: str, client: httpx.AsyncClient) -> list:
     # Query legals table to find all doc_ids for this BBL
     legals = await soda_get(client, ACRIS_LEGALS_URL, {
         "$where": f"borough='{parts['borough']}' AND block='{parts['block'].lstrip('0') or '0'}' AND lot='{parts['lot'].lstrip('0') or '0'}'",
-        "$select": "documentid,doc_type",
+        "$select": "document_id,doc_type",
         "$limit": 500,
     })
     
@@ -143,16 +152,16 @@ async def get_deed_history(bbl_str: str, client: httpx.AsyncClient) -> list:
         # Try with zero-padded
         legals = await soda_get(client, ACRIS_LEGALS_URL, {
             "$where": f"borough='{parts['borough']}' AND block='{parts['block']}' AND lot='{parts['lot']}'",
-            "$select": "documentid,doc_type",
+            "$select": "document_id,doc_type",
             "$limit": 500,
         })
 
-    deed_doc_ids = [r["documentid"] for r in legals 
+    deed_doc_ids = [r["document_id"] for r in legals 
                     if r.get("doc_type", "").upper() in [d.upper() for d in DEED_DOC_TYPES]]
     
     if not deed_doc_ids:
         # Fall back: get ALL doc IDs and filter by master
-        deed_doc_ids = [r["documentid"] for r in legals]
+        deed_doc_ids = [r["document_id"] for r in legals]
 
     if not deed_doc_ids:
         return []
@@ -164,8 +173,8 @@ async def get_deed_history(bbl_str: str, client: httpx.AsyncClient) -> list:
         batch = deed_doc_ids[i:i+batch_size]
         id_list = ",".join(f"'{d}'" for d in batch)
         masters = await soda_get(client, ACRIS_MASTER_URL, {
-            "$where": f"documentid in ({id_list}) AND doc_type in ('DEED','DEEDO','DEED, BARGAIN AND SALE','DEED IN LIEU','QUITCLAIM DEED','EXECUTOR DEED','TRUSTEES DEED','ADMINISTRATOR DEED','REFEREE DEED')",
-            "$select": "documentid,doc_type,document_amt,recorded_datetime,doc_date,crfn",
+            "$where": f"document_id in ({id_list}) AND doc_type in ('DEED','DEEDO','DEED, BARGAIN AND SALE','DEED IN LIEU','QUITCLAIM DEED','EXECUTOR DEED','TRUSTEES DEED','ADMINISTRATOR DEED','REFEREE DEED')",
+            "$select": "document_id,doc_type,document_amt,recorded_datetime,doc_date,crfn",
             "$order": "recorded_datetime DESC",
             "$limit": batch_size,
         })
@@ -186,8 +195,8 @@ async def get_parties_for_docs(doc_ids: list, client: httpx.AsyncClient) -> list
         batch = doc_ids[i:i+batch_size]
         id_list = ",".join(f"'{d}'" for d in batch)
         parties = await soda_get(client, ACRIS_PARTIES_URL, {
-            "$where": f"documentid in ({id_list})",
-            "$select": "documentid,party_type,name,address1,address2,city,state,zip,country",
+            "$where": f"document_id in ({id_list})",
+            "$select": "document_id,party_type,name,address_1,address_2,city,state,zip,country",
             "$limit": 500,
         })
         all_parties.extend(parties)
@@ -330,18 +339,18 @@ async def lookup_property(
         )
 
         # Get parties for top deeds
-        top_doc_ids = [d["documentid"] for d in deed_history[:20] if d.get("documentid")]
+        top_doc_ids = [d["documentid"] for d in deed_history[:20] if d.get("document_id")]
         parties = await get_parties_for_docs(top_doc_ids, client)
 
         # Organize parties by document
         parties_by_doc = {}
         for p in parties:
-            did = p.get("documentid")
+            did = p.get("document_id")
             if did not in parties_by_doc:
                 parties_by_doc[did] = {"grantors": [], "grantees": []}
             ptype = str(p.get("party_type", "")).strip()
             name = p.get("name", "").strip()
-            addr = " ".join(filter(None, [p.get("address1"), p.get("city"), p.get("state"), p.get("zip")]))
+            addr = " ".join(filter(None, [p.get("address_1"), p.get("city"), p.get("state"), p.get("zip")]))
             entry = {"name": name, "address": addr}
             if ptype == "1":
                 parties_by_doc[did]["grantors"].append(entry)
@@ -351,7 +360,7 @@ async def lookup_property(
         # Enrich deed history with parties
         enriched_deeds = []
         for deed in deed_history[:20]:
-            did = deed.get("documentid")
+            did = deed.get("document_id")
             doc_parties = parties_by_doc.get(did, {"grantors": [], "grantees": []})
             enriched_deeds.append({**deed, **doc_parties})
 
@@ -478,48 +487,38 @@ async def get_weekly_feed(
 ):
     """
     Returns a list of NYC commercial property transfers from the last N days.
-    Joins ACRIS Master + Legals + Parties for full picture.
+    ACRIS Open Data lags ~2-4 weeks, so we search back further to guarantee results.
     """
-    since_date = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S.000")
-    
+    # Guarantee at least 45 days back to cover ACRIS lag
+    effective_days = max(days, 45)
+    since_date = (datetime.utcnow() - timedelta(days=effective_days)).strftime("%Y-%m-%dT%H:%M:%S.000")
+
     async with httpx.AsyncClient() as client:
-        # Build where — keep it simple, Socrata SoQL is picky
-        where = f"recorded_datetime >= '{since_date}' AND doc_class='DEEDS AND OTHER CONVEYANCES'"
+        where = f"recorded_datetime >= '{since_date}'"
         if min_amount:
             where += f" AND document_amt >= {min_amount}"
+        if borough:
+            where += f" AND recorded_borough='{borough}'"
 
         masters = await soda_get(client, ACRIS_MASTER_URL, {
             "$where": where,
             "$order": "recorded_datetime DESC",
             "$limit": 500,
-            "$select": "documentid,doc_type,doc_class,document_amt,recorded_datetime,doc_date,crfn"
+            "$select": "document_id,doc_type,document_amt,recorded_datetime,document_date,crfn,recorded_borough"
         })
 
-        # Fallback: if doc_class filter also fails, try just date filter
-        if not masters:
-            where_simple = f"recorded_datetime >= '{since_date}'"
-            if min_amount:
-                where_simple += f" AND document_amt >= {min_amount}"
-            masters = await soda_get(client, ACRIS_MASTER_URL, {
-                "$where": where_simple,
-                "$order": "recorded_datetime DESC",
-                "$limit": 500,
-                "$select": "documentid,doc_type,doc_class,document_amt,recorded_datetime,doc_date,crfn"
-            })
-            # Filter in Python to deed-class docs only
-            deed_classes = {"DEEDS AND OTHER CONVEYANCES", "DEED"}
-            deed_types = {"DEED","DEEDO","DEED, BARGAIN AND SALE","QUITCLAIM DEED",
-                         "DEED IN LIEU","EXECUTOR DEED","TRUSTEES DEED","REFEREE DEED",
-                         "ADMINISTRATOR DEED","DEED, GIFT","DEED, CORRECTION"}
-            masters = [m for m in masters 
-                      if m.get("doc_class","").upper() in deed_classes
-                      or m.get("doc_type","").upper() in deed_types]
+        # Filter to deed types in Python (no doc_class field in this dataset)
+        deed_types = {"DEED","DEEDO","DEED, BARGAIN AND SALE","QUITCLAIM DEED",
+                     "DEED IN LIEU","EXECUTOR DEED","TRUSTEES DEED","REFEREE DEED",
+                     "ADMINISTRATOR DEED","DEED, GIFT","DEED, CORRECTION"}
+        masters = [m for m in masters if m.get("doc_type","").upper() in deed_types]
 
         if not masters:
-            return {"count": 0, "transactions": [], "generated_at": datetime.utcnow().isoformat(),
-                    "debug": f"No records found since {since_date}"}
+            return {"count": 0, "transactions": [],
+                    "note": f"No deed records found. Searched back {effective_days} days from {since_date}.",
+                    "generated_at": datetime.utcnow().isoformat()}
 
-        doc_ids = [m["documentid"] for m in masters if m.get("documentid")]
+        doc_ids = [m["document_id"] for m in masters if m.get("document_id")]
 
         # Fetch legals (BBL) and parties in parallel
         legals_list, parties_list = await asyncio.gather(
@@ -530,18 +529,18 @@ async def get_weekly_feed(
         # Index by document ID
         legals_by_doc = {}
         for l in legals_list:
-            did = l.get("documentid")
+            did = l.get("document_id")
             if did:
                 legals_by_doc.setdefault(did, []).append(l)
 
         parties_by_doc = {}
         for p in parties_list:
-            did = p.get("documentid")
+            did = p.get("document_id")
             if did:
                 parties_by_doc.setdefault(did, {"grantors": [], "grantees": []})
                 ptype = str(p.get("party_type", "")).strip()
                 name = p.get("name", "").strip()
-                addr = " ".join(filter(None, [p.get("address1"), p.get("city"), p.get("state")]))
+                addr = " ".join(filter(None, [p.get("address_1"), p.get("city"), p.get("state")]))
                 entry = {"name": name, "address": addr}
                 if ptype == "1":
                     parties_by_doc[did]["grantors"].append(entry)
@@ -551,7 +550,7 @@ async def get_weekly_feed(
         # Build final list
         transactions = []
         for master in masters:
-            did = master["documentid"]
+            did = master["document_id"]
             legs = legals_by_doc.get(did, [{}])
             leg = legs[0] if legs else {}
             parts = parties_by_doc.get(did, {"grantors": [], "grantees": []})
@@ -561,7 +560,7 @@ async def get_weekly_feed(
             bbl_str = normalize_bbl(b, bl.zfill(5), lt.zfill(4)) if b and bl and lt else ""
 
             transactions.append({
-                "documentid": did,
+                "document_id": did,
                 "bbl": bbl_str,
                 "borough": b,
                 "block": bl,
@@ -598,7 +597,7 @@ async def _batch_fetch_legals(doc_ids: list, client: httpx.AsyncClient, borough_
             where += f" AND borough='{borough_filter}'"
         rows = await soda_get(client, ACRIS_LEGALS_URL, {
             "$where": where,
-            "$select": "documentid,borough,block,lot,property_type,easement",
+            "$select": "document_id,borough,block,lot,property_type,easement",
             "$limit": batch_size * 2,
         })
         all_legals.extend(rows)
@@ -607,15 +606,22 @@ async def _batch_fetch_legals(doc_ids: list, client: httpx.AsyncClient, borough_
 
 async def _batch_fetch_parties(doc_ids: list, client: httpx.AsyncClient) -> list:
     all_parties = []
-    batch_size = 100
+    batch_size = 50  # smaller batches — parties_mod has more fields
     for i in range(0, min(len(doc_ids), 500), batch_size):
         batch = doc_ids[i:i+batch_size]
         id_list = ",".join(f"'{d}'" for d in batch)
+        # Try parties_mod first (has full address), fall back to basic
         rows = await soda_get(client, ACRIS_PARTIES_URL, {
-            "$where": f"documentid in ({id_list})",
-            "$select": "documentid,party_type,name,address1,city,state,zip",
+            "$where": f"document_id in ({id_list})",
+            "$select": "document_id,party_type,name,address_1,city,state,zip",
             "$limit": batch_size * 4,
         })
+        if not rows:
+            rows = await soda_get(client, ACRIS_PARTIES_BASIC_URL, {
+                "$where": f"document_id in ({id_list})",
+                "$select": "document_id,party_type,name",
+                "$limit": batch_size * 4,
+            })
         all_parties.extend(rows)
     return all_parties
 
