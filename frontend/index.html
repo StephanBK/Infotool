@@ -637,6 +637,7 @@ function renderLookup(d) {
             <th>Buyer (Grantee)</th>
             <th>Buyer Address</th>
             <th>Seller (Grantor)</th>
+            <th>Seller Address</th>
             <th>Amount</th>
             <th>Doc ID</th>
           </tr></thead>
@@ -659,7 +660,9 @@ function renderLookup(d) {
         <td><span style="font-size:11px;font-family:'Space Mono',monospace">${deed.doc_type || '—'}</span></td>
         <td style="font-weight:500;color:var(--accent2)">${grantee}</td>
         <td style="font-size:12px;color:var(--mid)">${granteeAddr}</td>
+        const grantorAddr = (deed.grantors || []).map(g => g.address).filter(Boolean).join(', ') || '—';
         <td style="color:var(--mid)">${grantor}</td>
+        <td style="font-size:12px;color:var(--mid)">${grantorAddr}</td>
         <td>${amt}</td>
         <td>${docLink}</td>
       </tr>`;
@@ -741,13 +744,14 @@ function renderFeed(data) {
           <th>Buyer</th>
           <th>Buyer Address</th>
           <th>Seller</th>
+          <th>Seller Address</th>
           <th>Amount</th>
           <th>ACRIS</th>
         </tr></thead>
         <tbody>`;
 
   if (txns.length === 0) {
-    html += `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--mid)">
+    html += `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--mid)">
       No transfers found for this period/filter.
     </td></tr>`;
   }
@@ -782,6 +786,7 @@ function renderFeed(data) {
       <td style="font-weight:500;color:var(--accent2);max-width:180px">${buyer}</td>
       <td style="font-size:12px;color:var(--mid);max-width:180px">${t.buyer_address || '—'}</td>
       <td style="color:var(--mid);max-width:180px">${seller}</td>
+      <td style="font-size:12px;color:var(--mid);max-width:180px">${t.seller_address || '—'}</td>
       <td>${amt}</td>
       <td>${link}</td>
     </tr>`;
