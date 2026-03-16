@@ -472,27 +472,44 @@ async def get_weekly_feed(
     Returns a list of NYC commercial property transfers from the last N days.
     Joins ACRIS Master + Legals + Parties for full picture.
     """
-    since_date = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
+    since_date = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S.000")
     
-    # Build ACRIS Master query
-    where_clauses = [
-        f"recorded_datetime >= '{since_date}'",
-        "doc_type in ('DEED','DEEDO','DEED, BARGAIN AND SALE','QUITCLAIM DEED','DEED IN LIEU')"
-    ]
-    if min_amount:
-        where_clauses.append(f"document_amt >= {min_amount}")
-
     async with httpx.AsyncClient() as client:
-        # Get recent deeds from master
+        # Build where — keep it simple, Socrata SoQL is picky
+        where = f"recorded_datetime >= '{since_date}' AND doc_class='DEEDS AND OTHER CONVEYANCES'"
+        if min_amount:
+            where += f" AND document_amt >= {min_amount}"
+
         masters = await soda_get(client, ACRIS_MASTER_URL, {
-            "$where": " AND ".join(where_clauses),
+            "$where": where,
             "$order": "recorded_datetime DESC",
             "$limit": 500,
-            "$select": "documentid,doc_type,document_amt,recorded_datetime,doc_date,crfn"
+            "$select": "documentid,doc_type,doc_class,document_amt,recorded_datetime,doc_date,crfn"
         })
-        
+
+        # Fallback: if doc_class filter also fails, try just date filter
         if not masters:
-            return {"count": 0, "transactions": [], "generated_at": datetime.utcnow().isoformat()}
+            where_simple = f"recorded_datetime >= '{since_date}'"
+            if min_amount:
+                where_simple += f" AND document_amt >= {min_amount}"
+            masters = await soda_get(client, ACRIS_MASTER_URL, {
+                "$where": where_simple,
+                "$order": "recorded_datetime DESC",
+                "$limit": 500,
+                "$select": "documentid,doc_type,doc_class,document_amt,recorded_datetime,doc_date,crfn"
+            })
+            # Filter in Python to deed-class docs only
+            deed_classes = {"DEEDS AND OTHER CONVEYANCES", "DEED"}
+            deed_types = {"DEED","DEEDO","DEED, BARGAIN AND SALE","QUITCLAIM DEED",
+                         "DEED IN LIEU","EXECUTOR DEED","TRUSTEES DEED","REFEREE DEED",
+                         "ADMINISTRATOR DEED","DEED, GIFT","DEED, CORRECTION"}
+            masters = [m for m in masters 
+                      if m.get("doc_class","").upper() in deed_classes
+                      or m.get("doc_type","").upper() in deed_types]
+
+        if not masters:
+            return {"count": 0, "transactions": [], "generated_at": datetime.utcnow().isoformat(),
+                    "debug": f"No records found since {since_date}"}
 
         doc_ids = [m["documentid"] for m in masters if m.get("documentid")]
 
@@ -631,3 +648,34 @@ async def health():
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
     app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="static")
+
+
+# ─── DEBUG: raw ACRIS query ───────────────────────────────────────────────────
+@app.get("/api/debug/acris")
+async def debug_acris(days: int = 7):
+    """Raw ACRIS query — shows exactly what the API returns so we can tune filters."""
+    since_date = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S.000")
+    async with httpx.AsyncClient() as client:
+        recent = await soda_get(client, ACRIS_MASTER_URL, {
+            "$order": "recorded_datetime DESC",
+            "$limit": 5,
+            "$select": "documentid,doc_type,doc_class,document_amt,recorded_datetime",
+        })
+        dated = await soda_get(client, ACRIS_MASTER_URL, {
+            "$where": f"recorded_datetime >= '{since_date}'",
+            "$order": "recorded_datetime DESC",
+            "$limit": 5,
+            "$select": "documentid,doc_type,doc_class,document_amt,recorded_datetime",
+        })
+        classes = await soda_get(client, ACRIS_MASTER_URL, {
+            "$order": "recorded_datetime DESC",
+            "$limit": 200,
+            "$select": "doc_type,doc_class",
+        })
+        unique_classes = list({(r.get("doc_class",""), r.get("doc_type","")) for r in classes})
+    return {
+        "since_date": since_date,
+        "most_recent_5_no_filter": recent,
+        "most_recent_5_with_date_filter": dated,
+        "unique_doc_class_type_combos_in_last_200": unique_classes[:40],
+    }
