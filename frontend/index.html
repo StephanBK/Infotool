@@ -352,6 +352,7 @@ footer {
   <div class="tabs">
     <button class="tab active" onclick="switchTab('lookup')">Property Lookup</button>
     <button class="tab" onclick="switchTab('feed')">Weekly Transfer Feed</button>
+    <button class="tab" onclick="switchTab('batch')">Batch Lookup</button>
   </div>
 
   <!-- LOOKUP PANEL -->
@@ -429,6 +430,48 @@ footer {
 
     <div id="feed-results"></div>
   </div>
+  <!-- BATCH PANEL -->
+  <div class="panel" id="panel-batch">
+    <div class="search-card" style="max-width:720px">
+      <h2>Batch Ownership Lookup</h2>
+      <p>Upload a CSV with multiple properties. We'll enrich each row with ownership, LLC pierce, deed history, and building data. Max 100 rows per upload.</p>
+
+      <div style="background:var(--paper);border:1px solid var(--border);padding:20px;margin-bottom:24px">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent);margin-bottom:12px">CSV Format</div>
+        <p style="font-size:13px;color:var(--mid);margin-bottom:12px;line-height:1.6">
+          Your CSV needs either <strong>address + borough</strong> columns, or a <strong>bbl</strong> column (or both). All other columns are preserved in the output.
+        </p>
+        <table style="font-size:12px;width:100%;border-collapse:collapse">
+          <thead><tr style="background:var(--ink);color:#fff">
+            <th style="padding:8px 12px;text-align:left;font-family:'Space Mono',monospace;font-weight:400;font-size:10px">address</th>
+            <th style="padding:8px 12px;text-align:left;font-family:'Space Mono',monospace;font-weight:400;font-size:10px">borough</th>
+            <th style="padding:8px 12px;text-align:left;font-family:'Space Mono',monospace;font-weight:400;font-size:10px">bbl (optional)</th>
+          </tr></thead>
+          <tbody>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border)">350 Fifth Avenue</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">manhattan</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--mid)"></td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border)">30 Hudson Yards</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">manhattan</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--mid)"></td></tr>
+            <tr><td style="padding:8px 12px;color:var(--mid)"></td><td style="padding:8px 12px;color:var(--mid)"></td><td style="padding:8px 12px">1008340001</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:16px">
+          <a href="/api/batch/template" class="btn secondary" style="text-decoration:none;font-size:11px;display:inline-flex">⬇ Download Template CSV</a>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>Upload Your CSV</label>
+        <input type="file" id="batch-file" accept=".csv" style="background:var(--paper);padding:10px;font-size:13px;width:100%;border:1px solid var(--border);cursor:pointer"/>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:8px;align-items:center">
+        <button class="btn" onclick="doBatch()" id="btn-batch">→ Run Batch Lookup</button>
+        <span id="batch-status" style="font-size:13px;color:var(--mid)"></span>
+      </div>
+    </div>
+
+    <div id="batch-results" style="margin-top:32px"></div>
+  </div>
+
 </div>
 
 <footer>
@@ -796,6 +839,64 @@ document.addEventListener('keydown', e => {
     if (active?.id === 'panel-feed') loadFeed();
   }
 });
+
+// ── BATCH ──────────────────────────────────────────────────────────────────
+async function doBatch() {
+  const fileInput = document.getElementById('batch-file');
+  const statusEl  = document.getElementById('batch-status');
+  const btn       = document.getElementById('btn-batch');
+  const resultsEl = document.getElementById('batch-results');
+
+  if (!fileInput.files.length) {
+    statusEl.textContent = 'Please select a CSV file first.';
+    return;
+  }
+
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+
+  btn.disabled = true;
+  statusEl.textContent = '';
+  resultsEl.innerHTML = `
+    <div class="loading">
+      <div class="spinner"></div>
+      <div style="font-family:'Space Mono',monospace;font-size:13px">Running lookups... this takes ~5s per row</div>
+      <div style="font-size:12px;color:#999;margin-top:8px">Do not close this tab</div>
+    </div>`;
+
+  try {
+    const r = await fetch('/api/batch/lookup-form', { method: 'POST', body: formData });
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.detail || 'Server error');
+    }
+
+    // Stream the CSV download
+    const blob = await r.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const ts   = new Date().toISOString().slice(0,10);
+    a.href     = url;
+    a.download = `inovues_ownership_batch_${ts}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    resultsEl.innerHTML = `
+      <div class="info-card full fade-in" style="padding:24px;background:#e6f9f2;border-color:#00b36b">
+        <h3 style="color:#00b36b">✓ Batch Complete</h3>
+        <p style="margin-top:8px;font-size:14px;color:var(--ink)">Your enriched CSV has been downloaded. Check your downloads folder.</p>
+        <p style="margin-top:8px;font-size:13px;color:var(--mid)">Columns added: bbl, address_resolved, building_class, year_built, owner_name_raw, dos_id, ceo_principal, registered_agent, principal_address, last_sale_date, last_sale_amount, last_buyer, last_seller</p>
+      </div>`;
+    statusEl.textContent = '';
+
+  } catch(e) {
+    showError('batch-results', e.message);
+    statusEl.textContent = '';
+  } finally {
+    btn.disabled = false;
+  }
+}
 </script>
 </body>
 </html>

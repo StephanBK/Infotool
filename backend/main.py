@@ -2,7 +2,7 @@
 INOVUES NYC Commercial Property Ownership Tool
 Exhaustive public records lookup: ACRIS → NYS DOS LLC Pierce → Weekly Feed
 """
-from fastapi import FastAPI, Query, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Query, HTTPException, BackgroundTasks, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -675,6 +675,142 @@ async def export_weekly_feed_csv(
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+
+
+# ─── TEMPLATE DOWNLOAD ────────────────────────────────────────────────────────
+@app.get("/api/batch/template")
+async def download_template():
+    """Download the CSV template for batch ownership lookup."""
+    template = (
+        "address,borough,bbl\n"
+        "350 Fifth Avenue,manhattan,\n"
+        "30 Hudson Yards,manhattan,\n"
+        ",,1008340001\n"
+        ",,3019280055\n"
+    )
+    return StreamingResponse(
+        io.BytesIO(template.encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=inovues_batch_template.csv"}
+    )
+
+
+# ─── BATCH LOOKUP ─────────────────────────────────────────────────────────────
+@app.post("/api/batch/lookup-form")
+async def batch_lookup_form(file: UploadFile = File(...)):
+    """
+    Accept multipart CSV upload, enrich each row with ownership data.
+    """
+    content_bytes = await file.read()
+    try:
+        df_in = pd.read_csv(io.BytesIO(content_bytes))
+    except Exception as e:
+        raise HTTPException(400, f"Could not parse CSV: {e}")
+
+    # Normalize column names
+    df_in.columns = [c.strip().lower().replace(" ", "_") for c in df_in.columns]
+
+    # Validate — need address+borough or bbl
+    has_address = "address" in df_in.columns
+    has_bbl     = "bbl" in df_in.columns
+    if not has_address and not has_bbl:
+        raise HTTPException(400, "CSV must have 'address' + 'borough' columns, or 'bbl' column")
+
+    # Cap at 100 rows per request
+    if len(df_in) > 100:
+        raise HTTPException(400, "Max 100 rows per batch. Split your file.")
+
+    results = []
+    async with httpx.AsyncClient() as client:
+        for _, row in df_in.iterrows():
+            out = dict(row)  # preserve original columns
+            bbl_val     = str(row.get("bbl", "")).strip()
+            address_val = str(row.get("address", "")).strip()
+            borough_val = str(row.get("borough", "manhattan")).strip() or "manhattan"
+
+            out["lookup_status"] = "pending"
+            try:
+                # Resolve BBL
+                resolved_bbl = None
+                if bbl_val and bbl_val not in ("nan", ""):
+                    resolved_bbl = bbl_val.replace("-","").replace(" ","").zfill(10)
+                elif address_val and address_val not in ("nan", ""):
+                    geo = await address_to_bbl(address_val, borough_val, client)
+                    if geo:
+                        resolved_bbl = geo.get("bbl")
+
+                if not resolved_bbl:
+                    out["lookup_status"] = "error: could not resolve BBL"
+                    results.append(out)
+                    continue
+
+                # PLUTO data
+                pluto = await get_pluto_data(resolved_bbl, client)
+
+                # Deed history
+                deeds = await get_deed_history(resolved_bbl, client)
+                top_ids = [d.get("document_id") for d in deeds[:10] if d.get("document_id")]
+                parties = await get_parties_for_docs(top_ids, client)
+
+                # Organise parties
+                by_doc = {}
+                for p in parties:
+                    did = p.get("document_id")
+                    if did:
+                        by_doc.setdefault(did, {"grantors":[], "grantees":[]})
+                        pt = str(p.get("party_type",""))
+                        e = {"name": p.get("name",""), "address": " ".join(filter(None,[p.get("address_1"),p.get("city"),p.get("state")]))}
+                        if pt == "1": by_doc[did]["grantors"].append(e)
+                        elif pt == "2": by_doc[did]["grantees"].append(e)
+
+                # Current owner
+                owner_name = pluto.get("ownername","")
+                last_deed = deeds[0] if deeds else {}
+                last_doc_id = last_deed.get("document_id","")
+                last_parties = by_doc.get(last_doc_id, {"grantors":[], "grantees":[]})
+                if last_parties["grantees"]:
+                    owner_name = last_parties["grantees"][0]["name"]
+
+                # LLC pierce
+                llc = await pierce_llc(owner_name, client)
+
+                # Write enriched columns
+                out["bbl"]                = resolved_bbl
+                out["address_resolved"]   = pluto.get("address","") or address_val
+                out["building_class"]     = pluto.get("bldgclass","")
+                out["year_built"]         = pluto.get("yearbuilt","")
+                out["floors"]             = pluto.get("numfloors","")
+                out["building_area_sqft"] = pluto.get("bldgarea","")
+                out["owner_name_raw"]     = owner_name
+                out["dos_id"]             = llc.get("dos_id","")
+                out["dos_status"]         = llc.get("dos_status","")
+                out["ceo_principal"]      = llc.get("ceo_name","")
+                out["registered_agent"]   = llc.get("registered_agent","")
+                out["principal_address"]  = llc.get("principal_address") or llc.get("process_address","")
+                out["entity_formed"]      = llc.get("date_formed","")
+                out["last_sale_date"]     = (last_deed.get("recorded_datetime") or last_deed.get("document_date","")).split("T")[0]
+                out["last_sale_amount"]   = last_deed.get("document_amt","")
+                out["last_buyer"]         = last_parties["grantees"][0]["name"] if last_parties["grantees"] else ""
+                out["last_seller"]        = last_parties["grantors"][0]["name"] if last_parties["grantors"] else ""
+                out["acris_url"]          = f"https://a836-acris.nyc.gov/DS/DocumentSearch/BBL?hsBoroughID={resolved_bbl[0]}&hsBBL={resolved_bbl}"
+                out["lookup_status"]      = "ok"
+
+            except Exception as e:
+                out["lookup_status"] = f"error: {str(e)[:80]}"
+
+            results.append(out)
+
+    df_out = pd.DataFrame(results)
+    buf = io.StringIO()
+    df_out.to_csv(buf, index=False)
+    buf.seek(0)
+
+    filename = f"inovues_ownership_batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 # ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
 @app.get("/api/health")

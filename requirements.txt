@@ -7,3 +7,4 @@ lxml==5.3.0
 pandas==2.2.3
 aiohttp==3.10.5
 python-dotenv==1.0.1
+python-multipart
