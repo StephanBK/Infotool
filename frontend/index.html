@@ -635,6 +635,7 @@ function renderLookup(d) {
             <th>Date</th>
             <th>Doc Type</th>
             <th>Buyer (Grantee)</th>
+            <th>Buyer Address</th>
             <th>Seller (Grantor)</th>
             <th>Amount</th>
             <th>Doc ID</th>
@@ -652,10 +653,12 @@ function renderLookup(d) {
         ? `<a class="doc-link" href="https://a836-acris.nyc.gov/DS/DocumentSearch/DocumentImageView?doc_id=${deed.document_id}" target="_blank">${deed.document_id.slice(-8)}</a>`
         : '—';
       
+      const granteeAddr = (deed.grantees || []).map(g => g.address).filter(Boolean).join(', ') || '—';
       html += `<tr>
         <td style="white-space:nowrap;font-family:'Space Mono',monospace;font-size:11px">${date}</td>
         <td><span style="font-size:11px;font-family:'Space Mono',monospace">${deed.doc_type || '—'}</span></td>
         <td style="font-weight:500;color:var(--accent2)">${grantee}</td>
+        <td style="font-size:12px;color:var(--mid)">${granteeAddr}</td>
         <td style="color:var(--mid)">${grantor}</td>
         <td>${amt}</td>
         <td>${docLink}</td>
@@ -736,6 +739,7 @@ function renderFeed(data) {
           <th>BBL</th>
           <th>Transaction Type</th>
           <th>Buyer</th>
+          <th>Buyer Address</th>
           <th>Seller</th>
           <th>Amount</th>
           <th>ACRIS</th>
@@ -743,7 +747,7 @@ function renderFeed(data) {
         <tbody>`;
 
   if (txns.length === 0) {
-    html += `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--mid)">
+    html += `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--mid)">
       No transfers found for this period/filter.
     </td></tr>`;
   }
@@ -776,6 +780,7 @@ function renderFeed(data) {
         <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--mid);margin-top:2px">${t.doc_type || ''}</div>
       </td>
       <td style="font-weight:500;color:var(--accent2);max-width:180px">${buyer}</td>
+      <td style="font-size:12px;color:var(--mid);max-width:180px">${t.buyer_address || '—'}</td>
       <td style="color:var(--mid);max-width:180px">${seller}</td>
       <td>${amt}</td>
       <td>${link}</td>
