@@ -19,6 +19,14 @@ from pathlib import Path
 
 app = FastAPI(title="INOVUES Ownership Tool", version="1.0.0")
 
+@app.on_event("startup")
+async def startup_event():
+    import sys
+    print(f"=== INOVUES starting ===", flush=True)
+    print(f"cwd: {Path.cwd()}", flush=True)
+    for p in [Path(__file__).parent.parent / "frontend", Path("/app/frontend")]:
+        print(f"frontend {p}: {p.exists()}", flush=True)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -694,6 +702,15 @@ async def debug_acris(days: int = 7):
 
 
 # ─── SERVE FRONTEND (MUST BE LAST) ────────────────────────────────────────────
-frontend_path = Path(__file__).parent.parent / "frontend"
-if frontend_path.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="static")
+_possible = [
+    Path(__file__).parent.parent / "frontend",
+    Path("/app/frontend"),
+    Path(__file__).parent / "frontend",
+]
+_frontend = next((p for p in _possible if p.exists()), None)
+if _frontend:
+    app.mount("/", StaticFiles(directory=str(_frontend), html=True), name="static")
+else:
+    @app.get("/")
+    async def root():
+        return {"message": "INOVUES API running. Frontend not found.", "docs": "/docs"}
