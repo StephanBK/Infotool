@@ -8,15 +8,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
 :root {
-  --ink: #0a0a0f;
-  --paper: #f5f4f0;
-  --accent: #ff4d1c;
-  --accent2: #0033ff;
-  --mid: #6b6b72;
-  --border: #d8d7d3;
+  --ink: #1a1a1a;
+  --paper: #f4fbfc;
+  --accent: #1fa8b8;
+  --accent2: #0d8a99;
+  --mid: #5a7f85;
+  --border: #c2e0e4;
   --card: #ffffff;
-  --success: #00b36b;
+  --success: #00a896;
   --warn: #f5a623;
+  --teal-dark: #0d6e7a;
+  --teal-light: #e0f4f6;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,7 +35,7 @@ nav {
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 40px;
   border-bottom: 1px solid var(--border);
-  background: var(--ink);
+  background: var(--teal-dark);
   position: sticky; top: 0; z-index: 100;
 }
 .nav-logo {
@@ -44,7 +46,7 @@ nav {
 .nav-logo span { color: var(--accent); }
 .nav-badge {
   font-size: 11px; padding: 4px 10px;
-  background: var(--accent); color: #fff;
+  background: rgba(255,255,255,0.2); color: #fff;
   font-weight: 600; letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -66,10 +68,10 @@ nav {
   letter-spacing: -0.02em;
   max-width: 700px;
 }
-.hero h1 em { font-style: normal; color: var(--accent2); }
+.hero h1 em { font-style: normal; color: var(--accent); }
 .hero-sub {
   margin-top: 16px; font-size: 17px;
-  color: var(--mid); max-width: 560px;
+  color: #3d7880; max-width: 560px;
   line-height: 1.6;
 }
 
@@ -93,7 +95,7 @@ nav {
 }
 .tab.active {
   color: var(--ink);
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--accent2);
   font-weight: 700;
 }
 
@@ -152,20 +154,20 @@ nav {
 .btn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 14px 28px;
-  background: var(--ink); color: #fff;
+  background: var(--teal-dark); color: #fff;
   font-family: 'Space Mono', monospace;
   font-size: 12px; letter-spacing: 0.08em;
   text-transform: uppercase; cursor: pointer;
   border: none; font-weight: 700;
   transition: background 0.15s;
 }
-.btn:hover { background: var(--accent); }
+.btn:hover { background: var(--accent2); }
 .btn.secondary {
   background: transparent; color: var(--ink);
   border: 1px solid var(--border);
 }
-.btn.secondary:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
-.btn.accent { background: var(--accent); }
+.btn.secondary:hover { background: var(--teal-dark); color: #fff; border-color: var(--teal-dark); }
+.btn.accent { background: var(--accent2); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* RESULTS */
@@ -175,7 +177,7 @@ nav {
   display: flex; align-items: flex-start;
   justify-content: space-between; gap: 20px;
   padding: 24px 28px;
-  background: var(--ink); color: #fff;
+  background: var(--teal-dark); color: #fff;
   margin-bottom: 2px;
 }
 .result-bbl {
@@ -202,7 +204,7 @@ nav {
 .info-card h3 {
   font-family: 'Space Mono', monospace;
   font-size: 10px; letter-spacing: 0.15em;
-  text-transform: uppercase; color: var(--accent);
+  text-transform: uppercase; color: var(--accent2);
   margin-bottom: 16px;
 }
 .kv-row {
@@ -230,7 +232,7 @@ nav {
 .deed-table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 thead tr {
-  background: var(--paper);
+  background: var(--teal-light);
   border-bottom: 2px solid var(--border);
 }
 th {
@@ -267,7 +269,7 @@ tr:hover td { background: var(--paper); }
 .feed-controls .input-group { margin-bottom: 0; min-width: 160px; }
 
 .feed-stats {
-  background: var(--ink); color: #fff;
+  background: var(--teal-dark); color: #fff;
   padding: 16px 28px;
   display: flex; gap: 40px;
   margin-bottom: 2px;
@@ -287,7 +289,7 @@ tr:hover td { background: var(--paper); }
 .spinner {
   display: inline-block; width: 24px; height: 24px;
   border: 2px solid var(--border);
-  border-top-color: var(--accent);
+  border-top-color: var(--accent2);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   margin-bottom: 16px;
@@ -295,7 +297,7 @@ tr:hover td { background: var(--paper); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .error-card {
-  background: #fff0ee; border: 1px solid var(--accent);
+  background: #e8f6f8; border: 1px solid var(--accent2);
   padding: 20px 24px; color: var(--accent);
   font-size: 14px;
 }
@@ -307,9 +309,9 @@ tr:hover td { background: var(--paper); }
   font-family: 'Space Mono', monospace;
   font-weight: 700; letter-spacing: 0.06em;
 }
-.pierce-badge.found { background: #e6f9f2; color: var(--success); }
+.pierce-badge.found { background: var(--teal-light); color: var(--teal-dark); }
 .pierce-badge.not-found { background: #fff5e6; color: var(--warn); }
-.pierce-badge.llc { background: #e8ecff; color: var(--accent2); }
+.pierce-badge.llc { background: var(--teal-light); color: var(--accent2); }
 
 /* FOOTER */
 footer {
@@ -338,7 +340,7 @@ footer {
 <body>
 
 <nav>
-  <div class="nav-logo">INO<span>V</span>UES <span style="color:rgba(255,255,255,0.3);margin:0 8px">|</span> <span style="color:rgba(255,255,255,0.6);font-size:12px">NYC Ownership Intel</span></div>
+  <div class="nav-logo" style="display:flex;align-items:center;gap:12px"><img src="/logo.jpg" alt="INOVUES" style="height:32px;width:32px;object-fit:contain;border-radius:2px"/><span>INOVUES <span style="color:rgba(255,255,255,0.4);margin:0 8px">|</span> <span style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:400">NYC Ownership Intel</span></span></div>
   <div class="nav-badge">Beta</div>
 </nav>
 
