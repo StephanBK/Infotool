@@ -558,10 +558,18 @@ async def get_weekly_feed(
         if borough:
             where += f" AND recorded_borough='{borough}'"
 
-        # Paginate ACRIS master to get all records beyond 500-row limit
+        # Build deed type filter — filter at source so pagination is deed-only
+        deed_type_list = "','".join([
+            "DEED","DEEDO","DEED, BARGAIN AND SALE","QUITCLAIM DEED",
+            "DEED IN LIEU","EXECUTOR DEED","TRUSTEES DEED","REFEREE DEED",
+            "ADMINISTRATOR DEED","DEED, GIFT","DEED, CORRECTION"
+        ])
+        where += f" AND doc_type in ('{deed_type_list}')"
+
+        # Paginate ACRIS master — now each page is deed-only, far more efficient
         masters = []
         offset = 0
-        page_size = 500
+        page_size = 1000
         while True:
             page = await soda_get(client, ACRIS_MASTER_URL, {
                 "$where": where,
@@ -576,14 +584,8 @@ async def get_weekly_feed(
             if len(page) < page_size:
                 break
             offset += page_size
-            if offset >= 10000:  # safety cap
+            if offset >= 50000:  # safety cap
                 break
-
-        # Filter to deed types in Python (no doc_class field in this dataset)
-        deed_types = {"DEED","DEEDO","DEED, BARGAIN AND SALE","QUITCLAIM DEED",
-                     "DEED IN LIEU","EXECUTOR DEED","TRUSTEES DEED","REFEREE DEED",
-                     "ADMINISTRATOR DEED","DEED, GIFT","DEED, CORRECTION"}
-        masters = [m for m in masters if m.get("doc_type","").upper() in deed_types]
 
         if not masters:
             return {"count": 0, "transactions": [],
